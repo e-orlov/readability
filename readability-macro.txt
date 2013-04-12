@@ -1,0 +1,127 @@
+' Intentionally left out of any excel xlsm file
+' To use, open Excel, go to Developer mode, and add this macro
+' Ref: http://office.microsoft.com/en-us/excel-help/create-a-macro-HP005204711.aspx
+
+' A few notes about this code
+' It comes as-is with no warranty
+' You will need to ensure you reference the following libraries: MSHTML, MSXML2
+' Ref: http://stackoverflow.com/questions/9879825/how-to-add-a-reference-programmatically-vba-excel
+
+' How it works
+' The macro is configured to start at row 3 using a URL in column 1
+' The Flesch and Flesch-Kincaid related metrics are provided in the columns after 1
+' Use the array list to provide column headers
+' If anyone has a better way to code this, you're welcome to it.  This was based on research and moving quickly.
+
+Option Compare Text
+
+Sub Display_Stylometric_Scores()
+    Dim Words As String
+    Dim Characters As String
+    Dim Paragraphs As String
+    Dim Sentences As String
+    Dim Sentences_per_paragraph As String
+    Dim Words_per_sentence As String
+    Dim Characters_per_word As String
+    Dim Ratio_of_passive_sentences As String
+    Dim Flesch_Reading_Ease_score As String
+    Dim Flesch_Kincaid_Grade_Level_score As String
+    Dim Coleman_Liau_Readability_Score As String
+    Dim Ampersands As Long
+    Dim Exclamations As Long
+    Dim row As Integer
+    Dim column As Integer
+    Dim ActiveDocument As Object
+    Dim RS As Object
+    Dim URL As String
+    Dim content As String
+    
+    row = 3
+
+    Set ActiveDocument = CreateObject("Word.Document")
+
+    Dim cellValue As String
+    cellValue = Worksheets("Sheet1").Cells(row, 1)
+
+    Do While Worksheets("Sheet1").Cells(row, 1) <> ""
+
+    On Error Resume Next
+    
+        URL = Worksheets("Sheet1").Cells(row, 1).Value
+        content = GetContent(URL)
+        
+        ActiveDocument.content = content
+
+        Set RS = ActiveDocument.content.ReadabilityStatistics
+
+        Words = RS(1).Value
+        Characters = RS(2).Value
+        Paragraphs = RS(3).Value
+        Sentences = RS(4).Value
+        Sentences_per_paragraph = RS(5).Value
+        Words_per_sentence = RS(6).Value
+        Characters_per_word = RS(7).Value
+        Ratio_of_passive_sentences = RS(8).Value
+        Flesch_Reading_Ease_score = RS(9).Value
+        Flesch_Kincaid_Grade_Level_score = RS(10).Value
+        Ampersands = CountChar(content, "&")
+        Exclamations = CountChar(content, "!")
+
+        Worksheets("Sheet1").Cells(row, 4).Resize(1, 12).Value = _
+            Array(Words, Characters, Paragraphs, Sentences, Sentences_per_paragraph, _
+                Words_per_sentence, Characters_per_word, Ratio_of_passive_sentences, _
+                Flesch_Reading_Ease_score, Flesch_Kincaid_Grade_Level_score, _
+                Ampersands, Exclamations)
+
+        row = row + 1
+    Loop
+
+End Sub
+
+Function CountChar(txt As String, char As String) As Long
+    CountChar = Len(txt) - Len(Replace(txt, char, ""))
+End Function
+
+Function GetContent(URL As String)
+    Dim vaWrite As Variant
+    Dim hDoc As MSHTML.HTMLDocument
+    Dim xHttp As MSXML2.XMLHTTP
+    Dim content As String
+    
+    'Go through each row in the range and get/set the content/scores
+    
+    'Set a reference to MSXML2
+    'Open a webpage using GET
+    Set xHttp = New MSXML2.XMLHTTP
+    xHttp.Open "GET", URL
+    xHttp.send
+
+    'Wait for the web page to finish loading
+    Do Until xHttp.readyState = 4
+        DoEvents
+    Loop
+
+    'If the web page rendered properly
+    If xHttp.Status = 200 Then
+    
+        On Error GoTo ErrorHandler
+        'Create a new HTMLdocument
+        Set hDoc = New MSHTML.HTMLDocument
+        'Put the GET response into the doc's body
+        hDoc.body.innerHTML = xHttp.responseText
+
+        'Get an array back containing the readability scores
+        ' Note the additional filter to search within a given DIV
+        
+        content = hDoc.getElementById("div-id-to-analyze").innerText
+        
+        GetContent = content
+         
+    End If
+    
+    Exit Function
+ErrorHandler:
+        GetContent = ""
+    
+End Function
+
